@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include <EEPROM.h>           // read/write EEPROM
 #include <SPI.h>
+#include <avr/wdt.h>          // watchdog for software reset
 
 #include "misc.h"             // random functions
 #include "config.h"           // config and eeprom
@@ -213,6 +214,7 @@ Serial.println("Setup mode.  Valid single-letter commands are:"), Serial.println
   Serial.println("   I     time Interval A->B mode");
   Serial.println("   L     TimeLab interval mode");
   Serial.println("   D     Debug mode");
+  Serial.println("   N     Null output mode");
   Serial.println(),  Serial.print("Enter mode: ");
 
   do
@@ -225,8 +227,9 @@ Serial.println("Setup mode.  Valid single-letter commands are:"), Serial.println
     case 'I': pConfigInfo->MODE = Interval;   break;
     case 'L': pConfigInfo->MODE = timeLab;    break;
     case 'D': pConfigInfo->MODE = Debug;    break;
+    case 'N': pConfigInfo->MODE = Null;    break;
       default:  valid = 0;
-      Serial.println("? Please enter T P I L or D");
+      Serial.println("? Please enter T P I L D or N");
     break;
   }
   } while (valid == 0);
@@ -480,11 +483,12 @@ void doSetupMenu(struct config_t *pConfigInfo)      // also display the default 
     	
   Serial.println();
   Serial.println("R   Reset all to default values");
-  Serial.println("W   Write changes and exit setup");
+  Serial.println("W   Write changes and restart");
   Serial.println("Z   Discard changes and exit setup");
   Serial.println("choose one: ");
     
-    response = toupper(getChar());    // wait for a character
+  response = toupper(getChar());    // wait for a character
+  Serial.println();
   
     switch(response)   
     {
@@ -513,7 +517,9 @@ void doSetupMenu(struct config_t *pConfigInfo)      // also display the default 
       case 'R': initializeConfig(pConfigInfo);
         break;
       case 'W':  // write changes and exit
+                      Serial.println("Writing changes to eeprom...");
                       EEPROM_writeAnything(CONFIG_START, *pConfigInfo); // save change to config
+                      Serial.println("Finished.");
                       return;
     	  break; 
       	case 'Z':	// discard changes and exit
@@ -526,8 +532,7 @@ void doSetupMenu(struct config_t *pConfigInfo)      // also display the default 
         Serial.println("");
         Serial.println("Setting EEPROM to factory status.  Stand by...");
         eeprom_clear();
-        Serial.println("Finished.  Restart to set serial number and config defaults.");
-        Serial.println("");
+        Serial.println("Finished.");
         return;
         break;      
       default:  Serial.println("???");  // 'bad selection'
@@ -600,6 +605,8 @@ void print_config (config_t x) {
   Serial.print("# SyncMode: ");Serial.println(x.SYNC_MODE);
   Serial.print("# Timeout: ");
   sprintf(tmpbuf,"0x%.2X",x.TIMEOUT);Serial.println(tmpbuf);
+  Serial.print("# Trigger Edge: ");Serial.print(x.START_EDGE[0]);Serial.print(" (chA), ");
+  Serial.print(x.START_EDGE[1]);Serial.println(" (chB)");
   Serial.print("# Time Dilation: ");Serial.print((int32_t)x.TIME_DILATION[0]);
   Serial.print(" (chA), ");Serial.print((int32_t)x.TIME_DILATION[1]);Serial.println(" (chB)");
   Serial.print("# FIXED_TIME2: ");Serial.print((int32_t)x.FIXED_TIME2[0]);
@@ -646,4 +653,3 @@ void eeprom_clear() {
   EEPROM.write(i, 0xFF);
   } 
 }
-
